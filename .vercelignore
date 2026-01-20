@@ -1,0 +1,14 @@
+# Ignorar archivos grandes y no necesarios en producción
+models/
+data/sol_1d_data_2020_to_2025.csv
+notebooks/
+output/
+tests/
+*.pkl  # o los específicos si no los usas todos
+*.h5
+*.csv  # si no necesitas ninguno en runtime
+.git/
+__pycache__/
+*.pyc
+venv/
+.env
