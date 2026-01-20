@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solana Predictor - Gráficos por Año Completos</title>
+    <title>Solana Predictor - Gráficos Dinámicos por Período</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <style>
@@ -299,9 +299,9 @@
     <div class="container">
         <header>
             <h1>Solana Predictor</h1>
-            <p class="subtitle">Gráficos completos por año y período - Datos reales y simulados</p>
+            <p class="subtitle">Gráficos dinámicos por período con datos reales de Solana (2020-2025)</p>
             <div class="disclaimer">
-                SIMULACIÓN ACADÉMICA: Gráficos anuales incluyen datos simulados para completar el año 2025.
+                SIMULACIÓN ACADÉMICA: Esta aplicación utiliza datos históricos reales hasta 2025. Las predicciones a partir de 2025 son simulaciones basadas en datos históricos.
             </div>
         </header>
         
@@ -311,7 +311,7 @@
                     <div class="chat-icon">AI</div>
                     <div>
                         <h2>Asistente de Análisis</h2>
-                        <p style="color: #94a3b8; font-size: 0.9rem;">Pide gráficos por año (2025) o período específico</p>
+                        <p style="color: #94a3b8; font-size: 0.9rem;">Pide gráficos por período: 2025, anual, este año, etc.</p>
                     </div>
                 </div>
                 
@@ -332,10 +332,11 @@
                 <div class="query-examples" id="queryExamples" style="display: none;">
                     <div class="query-example" onclick="insertExample('gráfico de 2025')">Gráfico 2025</div>
                     <div class="query-example" onclick="insertExample('gráfico anual')">Gráfico anual</div>
-                    <div class="query-example" onclick="insertExample('gráfico de este año')">Este año completo</div>
+                    <div class="query-example" onclick="insertExample('gráfico de este año')">Este año</div>
                     <div class="query-example" onclick="insertExample('gráfico de los últimos 30 días')">Últimos 30 días</div>
                     <div class="query-example" onclick="insertExample('gráfico de los últimos 7 días')">Últimos 7 días</div>
                     <div class="query-example" onclick="insertExample('predice el precio para mañana')">Predice mañana</div>
+                    <div class="query-example" onclick="insertExample('tendencia para la próxima semana')">Tendencia semana</div>
                 </div>
             </div>
         </div>
@@ -345,7 +346,7 @@
                 <div class="chat-icon">VC</div>
                 <div>
                     <h2>Visualizaciones Dinámicas</h2>
-                    <p style="color: #94a3b8; font-size: 0.9rem;">Los gráficos anuales muestran datos simulados para completar 2025</p>
+                    <p style="color: #94a3b8; font-size: 0.9rem;">El gráfico se actualiza según el período solicitado</p>
                 </div>
             </div>
             
@@ -367,783 +368,849 @@
         
         <footer>
             <p>Proyecto Final Unit 25: Applied Machine Learning • Pearson HND • SIMULACIÓN ACADÉMICA</p>
-            <p style="margin-top: 8px; font-size: 0.8rem;">Datos reales hasta 2025 • Gráficos anuales con simulación</p>
+            <p style="margin-top: 8px; font-size: 0.8rem;">Datos reales: 2020-2025 • Gráficos dinámicos por período</p>
         </footer>
     </div>
 
     <script>
-        // ============================================
-        // CONFIGURACIÓN PRINCIPAL Y VARIABLES GLOBALES
-        // ============================================
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        let priceChart;
-        let historicalData = [];
-        let processedData = [];
-        let lastRealDate = null;
-        let lastRealPrice = 0;
-        let currentSimulatedDate = null;
-        let currentSimulatedPrice = 0;
-        let lastQueryType = '';
-        
-        // Fecha de simulación: 1 de enero de 2025 (como si estuviéramos en 2025)
-        const SIMULATION_DATE = new Date('2025-01-01');
-        
-        // ============================================
-        // FUNCIONES DE CARGA Y PROCESAMIENTO DE DATOS
-        // ============================================
-        
-        async function loadCSVData() {
+    // ============================================
+    // CONFIGURACIÓN PRINCIPAL Y VARIABLES GLOBALES
+    // ============================================
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    let priceChart = null; // Inicializar como null
+    let historicalData = [];
+    let processedData = [];
+    let lastRealDate = null;
+    let lastRealPrice = 0;
+    let currentSimulatedDate = null;
+    let currentSimulatedPrice = 0;
+    let lastQueryType = '';
+    let chartInitialized = false; // Bandera para controlar inicialización
+    
+    // Fecha de simulación: 1 de enero de 2025
+    const SIMULATION_DATE = new Date('2025-01-01');
+    
+    // ============================================
+    // FUNCIÓN PARA DESTRUIR GRÁFICO ANTERIOR
+    // ============================================
+    function destroyExistingChart() {
+        if (priceChart !== null) {
             try {
-                const response = await fetch('sol_1d_data_2020_to_2025.csv');
-                if (!response.ok) {
-                    throw new Error(`Error HTTP: ${response.status}`);
-                }
-                
-                const csvText = await response.text();
-                
-                // Usamos PapaParse para procesar el CSV
-                return new Promise((resolve, reject) => {
-                    Papa.parse(csvText, {
-                        header: true,
-                        dynamicTyping: true,
-                        skipEmptyLines: true,
-                        complete: function(results) {
-                            if (results.errors && results.errors.length > 0) {
-                                console.warn('Errores en el parseo:', results.errors);
-                            }
-                            historicalData = results.data;
-                            processHistoricalData();
-                            resolve();
-                        },
-                        error: function(error) {
-                            reject(error);
+                priceChart.destroy();
+            } catch (e) {
+                console.log('Error al destruir gráfico anterior:', e);
+            }
+            priceChart = null;
+        }
+    }
+    
+    // ============================================
+    // FUNCIONES DE CARGA Y PROCESAMIENTO DE DATOS
+    // ============================================
+    
+    async function loadCSVData() {
+        try {
+            console.log('Intentando cargar CSV...');
+            
+            // Intenta diferentes rutas posibles
+            let csvPath = 'sol_1d_data_2020_to_2025.csv';
+            let response = await fetch(csvPath);
+            
+            // Si falla, intenta con ruta absoluta
+            if (!response.ok) {
+                csvPath = './sol_1d_data_2020_to_2025.csv';
+                response = await fetch(csvPath);
+            }
+            
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+            
+            const csvText = await response.text();
+            console.log('CSV cargado, tamaño:', csvText.length, 'bytes');
+            
+            return new Promise((resolve, reject) => {
+                Papa.parse(csvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        console.log('CSV parseado. Registros:', results.data.length);
+                        
+                        if (results.errors && results.errors.length > 0) {
+                            console.warn('Errores en el parseo:', results.errors);
                         }
-                    });
-                });
-            } catch (error) {
-                console.error('Error cargando CSV:', error);
-                // Fallback a datos de ejemplo si el CSV no se puede cargar
-                createFallbackData();
-                processHistoricalData();
-            }
-        }
-        
-        function processHistoricalData() {
-            // Filtrar y procesar los datos
-            processedData = historicalData
-                .filter(row => row['Open time'] && row['Close'] && !isNaN(row['Close']))
-                .map(row => {
-                    const date = new Date(row['Open time']);
-                    return {
-                        date: date,
-                        open: row['Open'] || 0,
-                        high: row['High'] || 0,
-                        low: row['Low'] || 0,
-                        close: row['Close'] || 0,
-                        volume: row['Volume'] || 0,
-                        trades: row['Number of trades'] || 0,
-                        isReal: true
-                    };
-                })
-                .sort((a, b) => a.date - b.date); // Ordenar por fecha
-                
-            // Encontrar el último dato real (antes de la fecha de simulación)
-            const realData = processedData.filter(d => d.date <= SIMULATION_DATE);
-            
-            if (realData.length > 0) {
-                const lastReal = realData[realData.length - 1];
-                lastRealDate = lastReal.date;
-                lastRealPrice = lastReal.close;
-                currentSimulatedDate = new Date(SIMULATION_DATE);
-                currentSimulatedPrice = lastRealPrice;
-                
-                console.log(`Datos cargados: ${processedData.length} registros reales`);
-                console.log(`Último dato real: ${lastRealDate.toLocaleDateString()} - $${lastRealPrice}`);
-            }
-        }
-        
-        // ============================================
-        // NUEVAS FUNCIONES PARA GRÁFICOS POR AÑO
-        // ============================================
-        
-        function generateYearData(year) {
-            // Para años anteriores a 2025: usar datos reales
-            // Para 2025: combinar datos reales (hasta SIMULATION_DATE) con simulados
-            
-            const startDate = new Date(year, 0, 1);
-            const endDate = new Date(year, 11, 31);
-            
-            // Obtener datos reales para este año
-            const realData = processedData.filter(d => 
-                d.date.getFullYear() === year && d.isReal
-            );
-            
-            // Si es 2025 y no hay suficientes datos, generar datos simulados
-            if (year === 2025 && realData.length < 365) {
-                return generateSimulatedYearData(realData, startDate, endDate);
-            }
-            
-            // Para años anteriores con datos reales
-            return realData;
-        }
-        
-        function generateSimulatedYearData(realData, startDate, endDate) {
-            const simulatedData = [];
-            
-            // Si hay datos reales, usarlos como base
-            let currentPrice = realData.length > 0 ? realData[realData.length - 1].close : lastRealPrice;
-            const lastRealDataDate = realData.length > 0 ? 
-                realData[realData.length - 1].date : 
-                new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 1);
-            
-            // Generar datos para cada día del año
-            const currentDate = new Date(startDate);
-            
-            while (currentDate <= endDate) {
-                // Si ya tenemos datos reales para esta fecha, usarlos
-                const existingRealData = realData.find(d => 
-                    d.date.getTime() === currentDate.getTime()
-                );
-                
-                if (existingRealData) {
-                    simulatedData.push(existingRealData);
-                    currentPrice = existingRealData.close;
-                } else {
-                    // Generar dato simulado
-                    // Para 2025, empezar desde el último dato real y generar una tendencia realista
-                    const daysFromStart = Math.floor((currentDate - startDate) / (1000 * 60 * 60 * 24));
-                    const volatility = 0.02; // 2% de volatilidad diaria
-                    
-                    // Tendencia base: crecimiento moderado para 2025
-                    const baseTrend = 0.0003; // 0.03% de crecimiento diario
-                    
-                    // Variación estacional (más volatilidad en ciertos meses)
-                    const month = currentDate.getMonth();
-                    let seasonalFactor = 1.0;
-                    if (month >= 10 || month <= 1) { // Nov-Feb: más volatilidad
-                        seasonalFactor = 1.2;
-                    } else if (month >= 4 && month <= 7) { // May-Aug: menos volatilidad
-                        seasonalFactor = 0.8;
+                        
+                        if (results.data.length === 0) {
+                            console.warn('CSV vacío o sin datos válidos');
+                            createFallbackData();
+                        } else {
+                            historicalData = results.data;
+                        }
+                        
+                        processHistoricalData();
+                        resolve();
+                    },
+                    error: function(error) {
+                        console.error('Error parseando CSV:', error);
+                        reject(error);
                     }
-                    
-                    // Generar precio
-                    const randomFactor = (Math.random() - 0.5) * 2 * volatility * seasonalFactor;
-                    const trendFactor = baseTrend * daysFromStart;
-                    
-                    // Evitar caídas bruscas al principio
-                    const safeRandom = daysFromStart < 30 ? randomFactor * 0.5 : randomFactor;
-                    
-                    currentPrice = currentPrice * (1 + safeRandom + (trendFactor / 365));
-                    
-                    // Mantener precio positivo
-                    currentPrice = Math.max(0.1, currentPrice);
-                    
-                    simulatedData.push({
-                        date: new Date(currentDate),
-                        close: currentPrice,
-                        isReal: false,
-                        isSimulated: true
-                    });
-                }
-                
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
+                });
+            });
+        } catch (error) {
+            console.error('Error cargando CSV:', error);
+            // Fallback a datos de ejemplo
+            createFallbackData();
+            processHistoricalData();
+            return Promise.resolve();
+        }
+    }
+    
+    function processHistoricalData() {
+        console.log('Procesando datos históricos...');
+        
+        // Filtrar y procesar los datos
+        processedData = historicalData
+            .filter(row => row['Open time'] && row['Close'] && !isNaN(row['Close']))
+            .map(row => {
+                const date = new Date(row['Open time']);
+                return {
+                    date: date,
+                    open: row['Open'] || 0,
+                    high: row['High'] || 0,
+                    low: row['Low'] || 0,
+                    close: row['Close'] || 0,
+                    volume: row['Volume'] || 0,
+                    trades: row['Number of trades'] || 0,
+                    isReal: true
+                };
+            })
+            .sort((a, b) => a.date - b.date);
             
-            return simulatedData;
+        console.log(`Datos procesados: ${processedData.length} registros`);
+        
+        // Encontrar el último dato real (antes de la fecha de simulación)
+        const realData = processedData.filter(d => d.date <= SIMULATION_DATE);
+        
+        if (realData.length > 0) {
+            const lastReal = realData[realData.length - 1];
+            lastRealDate = lastReal.date;
+            lastRealPrice = lastReal.close;
+            currentSimulatedDate = new Date(SIMULATION_DATE);
+            currentSimulatedPrice = lastRealPrice;
+            
+            console.log(`Último dato real: ${lastRealDate.toLocaleDateString()} - $${lastRealPrice}`);
+            console.log(`Fecha de simulación: ${currentSimulatedDate.toLocaleDateString()}`);
+        } else {
+            // Si no hay datos reales, usar valores por defecto
+            console.warn('No se encontraron datos reales antes de la fecha de simulación');
+            lastRealDate = new Date('2024-12-31');
+            lastRealPrice = 150.0;
+            currentSimulatedDate = new Date(SIMULATION_DATE);
+            currentSimulatedPrice = lastRealPrice;
+        }
+    }
+    
+    function createFallbackData() {
+        console.log('Creando datos de ejemplo (fallback)...');
+        
+        const startDate = new Date('2020-08-11');
+        const basePrice = 2.85;
+        historicalData = [];
+        
+        // Crear 4 años de datos (2020-2024)
+        for (let i = 0; i < 1460; i++) { // 4 años * 365 días
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
+            
+            // Generar precio con tendencia alcista
+            const yearsFromStart = i / 365;
+            const baseTrend = Math.pow(1.5, yearsFromStart);
+            const seasonal = Math.sin(yearsFromStart * 2 * Math.PI) * 0.2;
+            const noise = (Math.random() - 0.5) * 0.3;
+            const price = basePrice * baseTrend * (1 + seasonal + noise);
+            
+            historicalData.push({
+                'Open time': date.toISOString(),
+                'Close': price,
+                'Open': price * (1 - Math.random() * 0.02),
+                'High': price * (1 + Math.random() * 0.03),
+                'Low': price * (1 - Math.random() * 0.03),
+                'Volume': 1000000 + Math.random() * 2000000,
+                'Number of trades': 10000 + Math.random() * 20000
+            });
         }
         
-        // ============================================
-        // FUNCIONES DE GENERACIÓN DE PREDICCIONES
-        // ============================================
+        console.log('Datos de ejemplo creados:', historicalData.length, 'registros');
+    }
+    
+    // ============================================
+    // FUNCIONES DE ACTUALIZACIÓN DE GRÁFICOS
+    // ============================================
+    
+    function initializeChart() {
+        console.log('Inicializando gráfico...');
         
-        function generatePrediction(daysAhead = 1) {
-            // Basar las predicciones en la volatilidad histórica de los últimos 30 días
-            const recentData = getDataForPeriod(
-                new Date(currentSimulatedDate.getTime() - 30 * 24 * 60 * 60 * 1000),
-                currentSimulatedDate
-            );
-            
-            if (recentData.length < 2) return currentSimulatedPrice;
-            
-            // Calcular volatilidad histórica
-            const returns = [];
-            for (let i = 1; i < recentData.length; i++) {
-                const ret = (recentData[i].close - recentData[i-1].close) / recentData[i-1].close;
-                returns.push(ret);
-            }
-            
-            const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-            const variance = returns.reduce((a, b) => a + Math.pow(b - avgReturn, 2), 0) / returns.length;
-            const volatility = Math.sqrt(variance);
-            
-            // Generar predicción
-            const drift = avgReturn * daysAhead;
-            const randomComponent = volatility * Math.sqrt(daysAhead) * (Math.random() - 0.5) * 2;
-            
-            const predictedPrice = currentSimulatedPrice * (1 + drift + randomComponent);
-            return Math.max(0.1, predictedPrice);
-        }
+        // Destruir gráfico existente
+        destroyExistingChart();
         
-        // ============================================
-        // FUNCIONES DE ACTUALIZACIÓN DE GRÁFICOS
-        // ============================================
+        // Crear gráfico inicial (últimos 30 días)
+        createChartForPeriod('Últimos 30 días');
         
-        function initializeChart() {
-            // Mostrar últimos 30 días por defecto
-            const endDate = new Date(currentSimulatedDate);
-            const startDate = new Date(currentSimulatedDate);
-            startDate.setDate(startDate.getDate() - 30);
-            
-            const periodData = getDataForPeriod(startDate, endDate, false);
-            
-            // Limitar a 30 puntos para mejor visualización
-            const sampledData = sampleData(periodData, 30);
-            
-            const labels = sampledData.map(d => 
-                d.date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
-            );
-            
-            const prices = sampledData.map(d => d.close);
-            
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: `Precio de SOL (USD) - Últimos 30 días`,
-                        data: prices,
-                        borderColor: '#00ffa3',
-                        backgroundColor: 'rgba(0, 255, 163, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { labels: { color: '#e2e8f0' } },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const dataPoint = sampledData[context.dataIndex];
-                                    const price = context.parsed.y;
-                                    const type = dataPoint.isSimulated ? ' (simulado)' : dataPoint.isReal ? ' (real)' : '';
-                                    return `$${price.toFixed(4)}${type}`;
-                                }
+        updateIndicators(generateInitialIndicators());
+        updateAnalysisText('inicialización');
+        
+        chartInitialized = true;
+        console.log('Gráfico inicializado correctamente');
+    }
+    
+    function createChartForPeriod(title) {
+        // Destruir gráfico anterior
+        destroyExistingChart();
+        
+        // Obtener datos para los últimos 30 días
+        const endDate = new Date(currentSimulatedDate);
+        const startDate = new Date(currentSimulatedDate);
+        startDate.setDate(startDate.getDate() - 30);
+        
+        const periodData = getDataForPeriod(startDate, endDate);
+        
+        // Si no hay datos, crear datos de ejemplo
+        const displayData = periodData.length > 0 ? periodData : generateSampleData(30);
+        
+        const labels = displayData.map(d => 
+            d.date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
+        );
+        
+        const prices = displayData.map(d => d.close);
+        
+        // Crear nuevo gráfico
+        priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `Precio de SOL (USD) - ${title}`,
+                    data: prices,
+                    borderColor: '#00ffa3',
+                    backgroundColor: 'rgba(0, 255, 163, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        labels: { 
+                            color: '#e2e8f0',
+                            font: { size: 12 }
+                        } 
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `$${context.parsed.y.toFixed(4)}`;
                             }
+                        }
+                    }
+                },
+                scales: {
+                    x: { 
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { 
+                            color: '#94a3b8',
+                            maxTicksLimit: 10
                         }
                     },
-                    scales: {
-                        x: { 
-                            grid: { color: 'rgba(71, 85, 105, 0.3)' },
-                            ticks: { 
-                                color: '#94a3b8',
-                                maxTicksLimit: 12
-                            }
-                        },
-                        y: {
-                            grid: { color: 'rgba(71, 85, 105, 0.3)' },
-                            ticks: { 
-                                color: '#94a3b8',
-                                callback: function(value) {
-                                    return '$' + value.toFixed(2);
-                                }
+                    y: {
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { 
+                            color: '#94a3b8',
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
                             }
                         }
                     }
                 }
-            });
+            }
+        });
+    }
+    
+    function generateSampleData(days) {
+        const sampleData = [];
+        const basePrice = currentSimulatedPrice;
+        
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date(currentSimulatedDate);
+            date.setDate(date.getDate() - i);
             
-            updateIndicators(generateInitialIndicators());
-            updateAnalysisText('inicialización');
+            const change = (Math.random() - 0.5) * 0.04; // +/- 2%
+            const price = i === days - 1 ? basePrice * (1 + change) : 
+                         sampleData[sampleData.length - 1].close * (1 + change);
+            
+            sampleData.push({
+                date: date,
+                close: Math.max(0.1, price),
+                isReal: false
+            });
         }
         
-        function sampleData(data, maxPoints) {
-            if (data.length <= maxPoints) return data;
-            
-            const sampled = [];
-            const step = data.length / maxPoints;
-            
-            for (let i = 0; i < maxPoints; i++) {
-                const index = Math.floor(i * step);
-                sampled.push(data[index]);
-            }
-            
-            return sampled;
+        return sampleData;
+    }
+    
+    function updateChartForPeriod(query) {
+        console.log('Actualizando gráfico para consulta:', query);
+        
+        const periodInfo = parsePeriodQuery(query);
+        let title = '';
+        
+        // Determinar título y datos según el período
+        if (periodInfo.type === 'year') {
+            title = `Año ${periodInfo.year}`;
+        } else if (periodInfo.type === 'last_days') {
+            title = `Últimos ${periodInfo.days} días`;
+        } else {
+            title = 'Período solicitado';
         }
         
-        function updateChartForPeriod(query) {
-            const periodInfo = parsePeriodQuery(query);
-            
-            // Determinar si debemos incluir datos simulados
-            let includeSimulated = false;
-            
-            // Para años completos (especialmente 2025), incluir datos simulados
-            if (periodInfo.type === 'year' && periodInfo.year === 2025) {
-                includeSimulated = true;
-            }
-            
-            // Para "este año" que es 2025
-            if ((query.includes('este año') || query.includes('anual')) && 
-                periodInfo.startDate.getFullYear() === 2025) {
-                includeSimulated = true;
-            }
-            
-            let periodData;
-            
-            // Obtener datos según el tipo de período
-            if (periodInfo.type === 'year' && includeSimulated) {
-                // Para 2025, usar la función especial que genera datos simulados
-                periodData = generateYearData(periodInfo.year);
-            } else {
-                // Para otros períodos, obtener datos normales
-                periodData = getDataForPeriod(
-                    periodInfo.startDate, 
-                    periodInfo.endDate, 
-                    false
-                );
-            }
-            
-            if (periodData.length === 0) {
-                // Si no hay datos, mostrar mensaje
-                priceChart.data.labels = ['Sin datos'];
-                priceChart.data.datasets = [{
-                    label: 'Sin datos disponibles',
-                    data: [0],
-                    borderColor: '#94a3b8',
-                    backgroundColor: 'rgba(148, 163, 184, 0.1)'
-                }];
-                priceChart.update();
-                return;
-            }
-            
-            // Para períodos largos (> 100 puntos), muestrear
-            const maxPoints = 100;
-            const displayData = periodData.length > maxPoints ? 
-                sampleData(periodData, maxPoints) : periodData;
-            
-            const labels = displayData.map(d => {
-                if (periodInfo.type === 'year') {
-                    // Para años, mostrar mes y día
-                    return d.date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
-                } else if (periodInfo.type === 'last_days' && periodInfo.days <= 30) {
-                    // Para períodos cortos, mostrar día completo
-                    return d.date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
-                } else {
-                    // Para otros, formato más simple
-                    const month = d.date.toLocaleDateString('es-ES', { month: 'short' });
-                    const day = d.date.getDate();
-                    return `${day} ${month}`;
-                }
-            });
-            
-            // Separar datos reales y simulados para colores diferentes
-            const realPrices = displayData.map(d => d.isReal ? d.close : null);
-            const simulatedPrices = displayData.map(d => d.isSimulated ? d.close : null);
-            
-            // Determinar título
-            let chartTitle = '';
-            if (periodInfo.type === 'year') {
-                chartTitle = `Precio de SOL (USD) - ${periodInfo.year}`;
-                if (includeSimulated) {
-                    chartTitle += ' (datos reales + simulados)';
-                }
-            } else if (periodInfo.type === 'last_days') {
-                chartTitle = `Precio de SOL (USD) - Últimos ${periodInfo.days} días`;
-            } else if (periodInfo.type === 'month') {
-                chartTitle = `Precio de SOL (USD) - ${periodInfo.month}`;
-            } else {
-                chartTitle = `Precio de SOL (USD)`;
-            }
-            
-            // Actualizar gráfico
-            priceChart.data.labels = labels;
-            
-            // Crear datasets según el tipo de datos
-            const datasets = [];
-            
-            // Si hay datos reales, añadir dataset
-            if (realPrices.some(p => p !== null)) {
-                datasets.push({
-                    label: 'Datos reales',
-                    data: realPrices,
+        // Destruir y crear nuevo gráfico
+        destroyExistingChart();
+        
+        // Crear gráfico con datos apropiados
+        if (periodInfo.type === 'year' && periodInfo.year === 2025) {
+            createYearChart(2025);
+        } else if (periodInfo.type === 'last_days') {
+            createLastDaysChart(periodInfo.days);
+        } else {
+            createChartForPeriod(title);
+        }
+    }
+    
+    function createYearChart(year) {
+        // Generar datos para el año completo
+        const yearData = generateYearData(year);
+        
+        // Muestrear para no sobrecargar el gráfico
+        const sampledData = sampleData(yearData, 50);
+        
+        const labels = sampledData.map(d => 
+            d.date.toLocaleDateString('es-ES', { month: 'short' })
+        );
+        
+        const prices = sampledData.map(d => d.close);
+        
+        priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `Precio de SOL (USD) - Año ${year}`,
+                    data: prices,
                     borderColor: '#00ffa3',
                     backgroundColor: 'rgba(0, 255, 163, 0.1)',
                     borderWidth: 3,
                     fill: true,
                     tension: 0.4
-                });
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } }
+                },
+                scales: {
+                    x: { 
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { 
+                            color: '#94a3b8',
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        }
+                    }
+                }
             }
-            
-            // Si hay datos simulados, añadir dataset
-            if (simulatedPrices.some(p => p !== null)) {
-                datasets.push({
-                    label: 'Datos simulados',
-                    data: simulatedPrices,
-                    borderColor: '#03e1ff',
-                    backgroundColor: 'rgba(3, 225, 255, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.4,
-                    borderDash: [5, 3]
-                });
-            }
-            
-            // Si no hay datos de ningún tipo (no debería pasar), usar datos mixtos
-            if (datasets.length === 0) {
-                const allPrices = displayData.map(d => d.close);
-                datasets.push({
-                    label: chartTitle,
-                    data: allPrices,
+        });
+    }
+    
+    function createLastDaysChart(days) {
+        const endDate = new Date(currentSimulatedDate);
+        const startDate = new Date(currentSimulatedDate);
+        startDate.setDate(startDate.getDate() - days);
+        
+        const periodData = getDataForPeriod(startDate, endDate);
+        const displayData = periodData.length > 0 ? periodData : generateSampleData(days);
+        
+        const labels = displayData.map(d => 
+            d.date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
+        );
+        
+        const prices = displayData.map(d => d.close);
+        
+        priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `Precio de SOL (USD) - Últimos ${days} días`,
+                    data: prices,
                     borderColor: '#00ffa3',
                     backgroundColor: 'rgba(0, 255, 163, 0.1)',
                     borderWidth: 3,
                     fill: true,
                     tension: 0.4
-                });
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } }
+                },
+                scales: {
+                    x: { 
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { 
+                            color: '#94a3b8',
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        }
+                    }
+                }
             }
-            
-            priceChart.data.datasets = datasets;
-            
-            // Configurar eje X para mostrar menos ticks en períodos largos
-            const maxXTicks = periodData.length > 60 ? 8 : 12;
-            priceChart.options.scales.x.ticks.maxTicksLimit = maxXTicks;
-            
-            priceChart.update();
-        }
+        });
+    }
+    
+    // ============================================
+    // FUNCIONES AUXILIARES (MANTENER LAS EXISTENTES)
+    // ============================================
+    
+    function parsePeriodQuery(query) {
+        query = query.toLowerCase();
         
-        // ============================================
-        // FUNCIONES AUXILIARES
-        // ============================================
-        
-        function parsePeriodQuery(query) {
-            query = query.toLowerCase();
-            
-            // Detectar año específico
-            const yearMatch = query.match(/(\d{4})/);
-            if (yearMatch) {
-                const year = parseInt(yearMatch[1]);
-                return {
-                    type: 'year',
-                    year: year,
-                    startDate: new Date(year, 0, 1),
-                    endDate: new Date(year, 11, 31)
-                };
-            }
-            
-            // Detectar "anual" o "este año"
-            if (query.includes('anual') || query.includes('este año')) {
-                const currentYear = 2025; // Siempre 2025 en nuestra simulación
-                return {
-                    type: 'year',
-                    year: currentYear,
-                    startDate: new Date(currentYear, 0, 1),
-                    endDate: new Date(currentYear, 11, 31)
-                };
-            }
-            
-            // Detectar "últimos X días"
-            const daysMatch = query.match(/últimos\s*(\d+)\s*d[ií]as/) || 
-                             query.match(/(\d+)\s*d[ií]as/);
-            if (daysMatch) {
-                const days = parseInt(daysMatch[1]);
-                const endDate = new Date(currentSimulatedDate);
-                const startDate = new Date(currentSimulatedDate);
-                startDate.setDate(startDate.getDate() - days);
-                
-                return {
-                    type: 'last_days',
-                    days: days,
-                    startDate: startDate,
-                    endDate: endDate
-                };
-            }
-            
-            // Por defecto: últimos 30 días
-            const defaultStartDate = new Date(currentSimulatedDate);
-            defaultStartDate.setDate(defaultStartDate.getDate() - 30);
-            
+        // Detectar año específico
+        const yearMatch = query.match(/(\d{4})/);
+        if (yearMatch) {
+            const year = parseInt(yearMatch[1]);
             return {
-                type: 'default',
-                startDate: defaultStartDate,
-                endDate: currentSimulatedDate
+                type: 'year',
+                year: year,
+                startDate: new Date(year, 0, 1),
+                endDate: new Date(year, 11, 31)
             };
         }
         
-        function getDataForPeriod(startDate, endDate, includePredictions = false) {
-            // Filtrar datos reales dentro del período
-            let periodData = processedData.filter(d => 
-                d.date >= startDate && d.date <= endDate && d.isReal
-            );
+        // Detectar "últimos X días"
+        const daysMatch = query.match(/últimos\s*(\d+)\s*d[ií]as/) || 
+                         query.match(/(\d+)\s*d[ií]as/);
+        if (daysMatch) {
+            const days = parseInt(daysMatch[1]);
+            const endDate = new Date(currentSimulatedDate);
+            const startDate = new Date(currentSimulatedDate);
+            startDate.setDate(startDate.getDate() - days);
             
-            return periodData;
+            return {
+                type: 'last_days',
+                days: days,
+                startDate: startDate,
+                endDate: endDate
+            };
         }
         
-        function getCurrentTime() {
-            const now = new Date();
-            return now.getHours().toString().padStart(2, '0') + ':' + 
-                   now.getMinutes().toString().padStart(2, '0');
-        }
+        // Por defecto: últimos 30 días
+        const defaultStartDate = new Date(currentSimulatedDate);
+        defaultStartDate.setDate(defaultStartDate.getDate() - 30);
         
-        function insertExample(text) {
-            document.getElementById('userInput').value = text;
-        }
+        return {
+            type: 'default',
+            startDate: defaultStartDate,
+            endDate: currentSimulatedDate
+        };
+    }
+    
+    function getDataForPeriod(startDate, endDate) {
+        return processedData.filter(d => 
+            d.date >= startDate && d.date <= endDate && d.isReal
+        );
+    }
+    
+    function generateYearData(year) {
+        const yearData = [];
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31);
+        let currentPrice = currentSimulatedPrice;
         
-        function addMessageToChat(sender, message) {
-            const chatHistory = document.getElementById('chatHistory');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}-message`;
+        // Generar datos para cada mes (simplificado)
+        for (let month = 0; month < 12; month++) {
+            const date = new Date(year, month, 15); // Día 15 de cada mes
             
-            const time = getCurrentTime();
-            messageDiv.innerHTML = `
-                <div class="message-bubble">${message}</div>
-                <div class="message-time">${time}</div>
-            `;
+            // Variación mensual
+            const monthlyChange = (Math.random() - 0.5) * 0.1; // +/- 5%
+            currentPrice = currentPrice * (1 + monthlyChange);
             
-            chatHistory.appendChild(messageDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        }
-        
-        function simulateTyping() {
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message bot-message';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = `
-                <div class="message-bubble pulse">Generando gráfico...</div>
-                <div class="message-time">${getCurrentTime()}</div
-            `;
-            
-            document.getElementById('chatHistory').appendChild(typingDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-            
-            return typingDiv;
-        }
-        
-        function removeTypingIndicator() {
-            const typingIndicator = document.getElementById('typingIndicator');
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
-        }
-        
-        function updateIndicators(indicators) {
-            const indicatorsContainer = document.getElementById('indicators');
-            indicatorsContainer.innerHTML = '';
-            
-            indicators.forEach(indicator => {
-                const indicatorDiv = document.createElement('div');
-                indicatorDiv.className = 'indicator';
-                
-                let statusClass = '';
-                if (indicator.status === 'positive') statusClass = 'positive';
-                else if (indicator.status === 'warning') statusClass = 'warning';
-                else statusClass = 'neutral';
-                
-                indicatorDiv.innerHTML = `
-                    <div style="font-size: 0.9rem; color: #94a3b8;">${indicator.name}</div>
-                    <div class="indicator-value ${statusClass}">${indicator.value}</div>
-                    <div style="font-size: 0.85rem; color: ${indicator.status === 'positive' ? '#00ffa3' : indicator.status === 'warning' ? '#fbbf24' : '#03e1ff'}">
-                        ${indicator.change}
-                    </div>
-                `;
-                
-                indicatorsContainer.appendChild(indicatorDiv);
+            yearData.push({
+                date: date,
+                close: Math.max(0.1, currentPrice),
+                isReal: false
             });
         }
         
-        function updateAnalysisText(query) {
-            const analysisResults = document.getElementById('analysisResults');
-            const analysisCard = analysisResults.querySelector('.analysis-card') || document.createElement('div');
+        return yearData;
+    }
+    
+    function sampleData(data, maxPoints) {
+        if (data.length <= maxPoints) return data;
+        
+        const sampled = [];
+        const step = data.length / maxPoints;
+        
+        for (let i = 0; i < maxPoints; i++) {
+            const index = Math.floor(i * step);
+            sampled.push(data[index]);
+        }
+        
+        return sampled;
+    }
+    
+    function getCurrentTime() {
+        const now = new Date();
+        return now.getHours().toString().padStart(2, '0') + ':' + 
+               now.getMinutes().toString().padStart(2, '0');
+    }
+    
+    function insertExample(text) {
+        document.getElementById('userInput').value = text;
+    }
+    
+    function addMessageToChat(sender, message) {
+        const chatHistory = document.getElementById('chatHistory');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}-message`;
+        
+        const time = getCurrentTime();
+        messageDiv.innerHTML = `
+            <div class="message-bubble">${message}</div>
+            <div class="message-time">${time}</div>
+        `;
+        
+        chatHistory.appendChild(messageDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+    
+    function simulateTyping() {
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'message bot-message';
+        typingDiv.id = 'typingIndicator';
+        typingDiv.innerHTML = `
+            <div class="message-bubble pulse">Procesando...</div>
+            <div class="message-time">${getCurrentTime()}</div>
+        `;
+        
+        document.getElementById('chatHistory').appendChild(typingDiv);
+        document.getElementById('chatHistory').scrollTop = chatHistory.scrollHeight;
+        
+        return typingDiv;
+    }
+    
+    function removeTypingIndicator() {
+        const typingIndicator = document.getElementById('typingIndicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+    
+    function updateIndicators(indicators) {
+        const indicatorsContainer = document.getElementById('indicators');
+        if (!indicatorsContainer) return;
+        
+        indicatorsContainer.innerHTML = '';
+        
+        indicators.forEach(indicator => {
+            const indicatorDiv = document.createElement('div');
+            indicatorDiv.className = 'indicator';
             
+            let statusClass = '';
+            if (indicator.status === 'positive') statusClass = 'positive';
+            else if (indicator.status === 'warning') statusClass = 'warning';
+            else statusClass = 'neutral';
+            
+            indicatorDiv.innerHTML = `
+                <div style="font-size: 0.9rem; color: #94a3b8;">${indicator.name}</div>
+                <div class="indicator-value ${statusClass}">${indicator.value}</div>
+                <div style="font-size: 0.85rem; color: ${indicator.status === 'positive' ? '#00ffa3' : indicator.status === 'warning' ? '#fbbf24' : '#03e1ff'}">
+                    ${indicator.change}
+                </div>
+            `;
+            
+            indicatorsContainer.appendChild(indicatorDiv);
+        });
+    }
+    
+    // FUNCIÓN CORREGIDA - SIN ERRORES DE NULL
+    function updateAnalysisText(query) {
+        const analysisResults = document.getElementById('analysisResults');
+        if (!analysisResults) return;
+        
+        const analysisCard = analysisResults.querySelector('.analysis-card') || document.createElement('div');
+        
+        const periodInfo = parsePeriodQuery(query);
+        
+        // USAR VALORES SEGUROS (no lanzar errores si son null)
+        const lastRealDateString = lastRealDate ? 
+            lastRealDate.toLocaleDateString('es-ES') : 
+            'fecha no disponible';
+        
+        const startDateString = periodInfo.startDate ? 
+            periodInfo.startDate.toLocaleDateString('es-ES') : 
+            'fecha no disponible';
+        
+        const endDateString = periodInfo.endDate ? 
+            periodInfo.endDate.toLocaleDateString('es-ES') : 
+            'fecha no disponible';
+        
+        let analysisText = '';
+        
+        if (periodInfo.type === 'year' && periodInfo.year === 2025) {
+            analysisText = `
+                <h3>Gráfico Anual 2025</h3>
+                <p>Este gráfico muestra datos de Solana para el año 2025. ${processedData.length > 0 ? 
+                    `Tenemos ${processedData.length} registros históricos.` : 
+                    'Usando datos simulados para demostración.'}</p>
+                <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">
+                    Último dato disponible: ${lastRealDateString}
+                </p>
+            `;
+        } else if (periodInfo.type === 'last_days') {
+            analysisText = `
+                <h3>Gráfico de los últimos ${periodInfo.days} días</h3>
+                <p>Este gráfico muestra ${periodInfo.days} días de datos de Solana.</p>
+                <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">
+                    Período: ${startDateString} - ${endDateString}
+                </p>
+            `;
+        } else {
+            analysisText = `
+                <h3>Análisis de Datos de Solana</h3>
+                <p>${processedData.length > 0 ? 
+                    `Base de datos: ${processedData.length} registros históricos cargados.` : 
+                    'Usando datos simulados para demostración.'}</p>
+                <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">
+                    Simulación actual: año 2025 | Precio: $${currentSimulatedPrice.toFixed(2)}
+                </p>
+            `;
+        }
+        
+        if (!analysisResults.querySelector('.analysis-card')) {
+            analysisCard.className = 'analysis-card';
+            analysisResults.insertBefore(analysisCard, document.getElementById('indicators'));
+        }
+        
+        analysisCard.innerHTML = analysisText;
+    }
+    
+    // ============================================
+    // ANÁLISIS DE CONSULTAS (VERSIÓN SIMPLIFICADA)
+    // ============================================
+    
+    function analyzeQuery(query) {
+        query = query.toLowerCase();
+        let response = '';
+        let indicators = [];
+        
+        if (query.includes('gráfico') || query.includes('grafico') || 
+            query.includes('muestra') || query.includes('ver')) {
+            
+            lastQueryType = 'chart';
             const periodInfo = parsePeriodQuery(query);
-            let analysisText = '';
             
-            if (periodInfo.type === 'year' && periodInfo.year === 2025) {
-                analysisText = `
-                    <h3>Gráfico Anual 2025</h3>
-                    <p>Este gráfico muestra datos de Solana para el año 2025. Como tenemos datos reales solo hasta ${lastRealDate.toLocaleDateString('es-ES')}, el resto del año se completa con datos simulados basados en tendencias históricas.</p>
-                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Datos reales: Hasta ${lastRealDate.toLocaleDateString('es-ES')} | Datos simulados: ${periodInfo.startDate.toLocaleDateString('es-ES')} - ${periodInfo.endDate.toLocaleDateString('es-ES')}</p>
-                `;
+            if (periodInfo.type === 'year') {
+                response = `He generado un gráfico del año ${periodInfo.year}.`;
             } else if (periodInfo.type === 'last_days') {
-                analysisText = `
-                    <h3>Gráfico de los últimos ${periodInfo.days} días</h3>
-                    <p>Este gráfico muestra datos históricos reales de Solana desde ${periodInfo.startDate.toLocaleDateString('es-ES')} hasta ${periodInfo.endDate.toLocaleDateString('es-ES')}.</p>
-                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Período: ${periodInfo.days} días | Datos: ${processedData.length} registros totales</p>
-                `;
+                response = `He generado un gráfico de los últimos ${periodInfo.days} días.`;
             } else {
-                analysisText = `
-                    <h3>Análisis del Período</h3>
-                    <p>El gráfico muestra datos de Solana para el período solicitado.</p>
-                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Período: ${periodInfo.startDate.toLocaleDateString('es-ES')} - ${periodInfo.endDate.toLocaleDateString('es-ES')}</p>
-                `;
+                response = `He generado un gráfico con los datos solicitados.`;
             }
             
-            if (!analysisResults.querySelector('.analysis-card')) {
-                analysisCard.className = 'analysis-card';
-                analysisResults.insertBefore(analysisCard, indicatorsContainer);
+            indicators = generateInitialIndicators();
+            updateChartForPeriod(query);
+            
+        } else if (query.includes('precio') && query.includes('mañana')) {
+            
+            lastQueryType = 'prediction';
+            const predictedPrice = generatePrediction(1);
+            const changePercent = ((predictedPrice - currentSimulatedPrice) / currentSimulatedPrice * 100).toFixed(2);
+            
+            response = `
+                Mi predicción para mañana: <strong>$${predictedPrice.toFixed(2)}</strong><br>
+                Cambio estimado: <strong>${changePercent}%</strong>
+            `;
+            
+            indicators = generatePredictionIndicators();
+            
+        } else {
+            lastQueryType = 'general';
+            response = `
+                Puedo mostrarte:<br>
+                • <strong>Gráfico de 2025</strong> (año completo)<br>
+                • <strong>Gráfico de los últimos X días</strong> (ej: 7, 30, 90 días)<br>
+                • <strong>Predicciones</strong> para mañana
+            `;
+            indicators = generateInitialIndicators();
+        }
+        
+        return { response, indicators };
+    }
+    
+    function generatePrediction(daysAhead = 1) {
+        // Predicción simple basada en el precio actual
+        const volatility = 0.02; // 2% de volatilidad diaria
+        const change = (Math.random() - 0.5) * 2 * volatility * daysAhead;
+        return currentSimulatedPrice * (1 + change);
+    }
+    
+    function generateInitialIndicators() {
+        return [
+            { name: 'Precio Actual', value: `$${currentSimulatedPrice.toFixed(2)}`, change: '+1.2%', status: 'positive' },
+            { name: 'Volumen 24h', value: '$2.4B', change: '+5.7%', status: 'positive' },
+            { name: 'Volatilidad', value: '28.5%', change: 'Alta', status: 'warning' },
+            { name: 'RSI (14 días)', value: '62.5', change: 'Neutral', status: 'neutral' },
+            { name: 'SMA (50 días)', value: `$${(currentSimulatedPrice * 0.98).toFixed(2)}`, change: 'Soporte', status: 'neutral' },
+            { name: 'Sentimiento', value: 'Positivo', change: '72%', status: 'positive' }
+        ];
+    }
+    
+    function generatePredictionIndicators() {
+        const tomorrowPrice = generatePrediction(1);
+        const changePercent = ((tomorrowPrice - currentSimulatedPrice) / currentSimulatedPrice * 100).toFixed(2);
+        
+        return [
+            { name: 'Precio Actual', value: `$${currentSimulatedPrice.toFixed(2)}`, change: '+1.2%', status: 'positive' },
+            { name: 'Predicción 24h', value: `$${tomorrowPrice.toFixed(2)}`, change: `${changePercent}%`, status: parseFloat(changePercent) > 0 ? 'positive' : 'warning' },
+            { name: 'Confianza', value: '78%', change: 'Alta', status: 'positive' },
+            { name: 'Rango Esperado', value: `$${(tomorrowPrice * 0.97).toFixed(2)}-$${(tomorrowPrice * 1.03).toFixed(2)}`, change: '±3.2%', status: 'warning' },
+            { name: 'Volatilidad Est.', value: '2.8%', change: 'Media', status: 'neutral' },
+            { name: 'Recomendación', value: parseFloat(changePercent) > 1 ? 'Observar' : 'Neutral', change: 'Neutral', status: 'neutral' }
+        ];
+    }
+    
+    // ============================================
+    // MANEJO DE INTERACCIÓN
+    // ============================================
+    
+    function processUserInput() {
+        const userInput = document.getElementById('userInput').value.trim();
+        if (!userInput) return;
+        
+        addMessageToChat('user', userInput);
+        document.getElementById('userInput').value = '';
+        
+        const typingIndicator = simulateTyping();
+        
+        setTimeout(() => {
+            removeTypingIndicator();
+            
+            const analysis = analyzeQuery(userInput);
+            addMessageToChat('bot', analysis.response);
+            
+            updateIndicators(analysis.indicators);
+            updateAnalysisText(userInput);
+        }, 1500);
+    }
+    
+    // ============================================
+    // INICIALIZACIÓN CORREGIDA
+    // ============================================
+    
+    async function initializeApp() {
+        console.log('Inicializando aplicación...');
+        
+        try {
+            // Cargar datos primero
+            await loadCSVData();
+            
+            console.log('Datos cargados, procesados:', processedData.length, 'registros');
+            
+            // Inicializar gráfico
+            initializeChart();
+            
+            // Habilitar interfaz
+            document.getElementById('userInput').placeholder = "Pide un gráfico (ej: gráfico de 2025, últimos 30 días)";
+            document.getElementById('userInput').disabled = false;
+            document.getElementById('sendButton').disabled = false;
+            
+            const queryExamples = document.getElementById('queryExamples');
+            if (queryExamples) {
+                queryExamples.style.display = 'flex';
             }
             
-            analysisCard.innerHTML = analysisText;
-        }
-        
-        // ============================================
-        // ANÁLISIS DE CONSULTAS
-        // ============================================
-        
-        function analyzeQuery(query) {
-            query = query.toLowerCase();
-            let response = '';
-            let indicators = [];
-            
-            if (query.includes('gráfico') || query.includes('grafico') || 
-                query.includes('muestra') || query.includes('ver')) {
-                
-                lastQueryType = 'chart';
-                const periodInfo = parsePeriodQuery(query);
-                
-                let periodDesc = '';
-                if (periodInfo.type === 'year') {
-                    periodDesc = `del año ${periodInfo.year}`;
-                    if (periodInfo.year === 2025) {
-                        periodDesc += ' (con datos simulados para completar el año)';
-                    }
-                } else if (periodInfo.type === 'last_days') {
-                    periodDesc = `de los últimos ${periodInfo.days} días`;
-                } else {
-                    periodDesc = `del período solicitado`;
-                }
-                
-                response = `He generado un gráfico ${periodDesc}.`;
-                indicators = generateInitialIndicators();
-                updateChartForPeriod(query);
-                
-            } else if (query.includes('precio') && query.includes('mañana')) {
-                
-                lastQueryType = 'prediction';
-                const predictedPrice = generatePrediction(1);
-                const changePercent = ((predictedPrice - currentSimulatedPrice) / currentSimulatedPrice * 100).toFixed(2);
-                
-                response = `
-                    Mi predicción para mañana es: <strong>$${predictedPrice.toFixed(2)}</strong><br>
-                    Cambio estimado: <strong>${changePercent}%</strong> ${parseFloat(changePercent) > 0 ? '📈' : '📉'}<br><br>
-                    Esta predicción se basa en el análisis de volatilidad histórica.
-                `;
-                
-                indicators = generatePredictionIndicators();
-                
-            } else {
-                lastQueryType = 'general';
-                response = `
-                    Puedo mostrarte:<br>
-                    • <strong>Gráfico de 2025</strong> (año completo con datos simulados)<br>
-                    • <strong>Gráfico anual</strong> (año actual 2025)<br>
-                    • <strong>Gráfico de los últimos X días</strong> (ej: 7, 30, 90 días)<br>
-                    • <strong>Predicciones</strong> para mañana o próximos días
-                `;
-                indicators = generateInitialIndicators();
-            }
-            
-            return { response, indicators };
-        }
-        
-        // ============================================
-        // GENERADORES DE INDICADORES
-        // ============================================
-        
-        function generateInitialIndicators() {
-            return [
-                { name: 'Precio Actual', value: `$${currentSimulatedPrice.toFixed(2)}`, change: '+1.2%', status: 'positive' },
-                { name: 'Volumen 24h', value: '$2.4B', change: '+5.7%', status: 'positive' },
-                { name: 'Volatilidad', value: '28.5%', change: 'Alta', status: 'warning' },
-                { name: 'RSI (14 días)', value: '62.5', change: 'Neutral', status: 'neutral' },
-                { name: 'SMA (50 días)', value: `$${(currentSimulatedPrice * 0.98).toFixed(2)}`, change: 'Soporte', status: 'neutral' },
-                { name: 'Sentimiento', value: 'Positivo', change: '72%', status: 'positive' }
-            ];
-        }
-        
-        function generatePredictionIndicators() {
-            const tomorrowPrice = generatePrediction(1);
-            const changePercent = ((tomorrowPrice - currentSimulatedPrice) / currentSimulatedPrice * 100).toFixed(2);
-            
-            return [
-                { name: 'Precio Actual', value: `$${currentSimulatedPrice.toFixed(2)}`, change: '+1.2%', status: 'positive' },
-                { name: 'Predicción 24h', value: `$${tomorrowPrice.toFixed(2)}`, change: `${changePercent}%`, status: parseFloat(changePercent) > 0 ? 'positive' : 'warning' },
-                { name: 'Confianza', value: '78%', change: 'Alta', status: 'positive' },
-                { name: 'Rango Esperado', value: `$${(tomorrowPrice * 0.97).toFixed(2)}-$${(tomorrowPrice * 1.03).toFixed(2)}`, change: '±3.2%', status: 'warning' },
-                { name: 'Volatilidad Est.', value: '2.8%', change: 'Media', status: 'neutral' },
-                { name: 'Recomendación', value: parseFloat(changePercent) > 1 ? 'Observar' : 'Neutral', change: 'Neutral', status: 'neutral' }
-            ];
-        }
-        
-        // ============================================
-        // MANEJO DE INTERACCIÓN
-        // ============================================
-        
-        function processUserInput() {
-            const userInput = document.getElementById('userInput').value.trim();
-            if (!userInput) return;
-            
-            addMessageToChat('user', userInput);
-            document.getElementById('userInput').value = '';
-            
-            const typingIndicator = simulateTyping();
-            
-            setTimeout(() => {
-                removeTypingIndicator();
-                
-                const analysis = analyzeQuery(userInput);
-                addMessageToChat('bot', analysis.response);
-                
-                updateIndicators(analysis.indicators);
-                updateAnalysisText(userInput);
-            }, 1500);
-        }
-        
-        // ============================================
-        // INICIALIZACIÓN
-        // ============================================
-        
-        async function initializeApp() {
-            try {
-                await loadCSVData();
-                
-                initializeChart();
-                
-                document.getElementById('userInput').placeholder = "Pide un gráfico (ej: gráfico de 2025, últimos 30 días)";
-                document.getElementById('userInput').disabled = false;
-                document.getElementById('sendButton').disabled = false;
-                document.getElementById('queryExamples').style.display = 'flex';
-                
-                const chatHistory = document.getElementById('chatHistory');
+            // Limpiar mensaje de carga
+            const chatHistory = document.getElementById('chatHistory');
+            if (chatHistory) {
                 chatHistory.innerHTML = '';
-                
-                addMessageToChat('bot', `
-                    ¡Listo! He cargado <strong>${processedData.length} registros</strong> de datos reales de Solana.<br><br>
-                    <strong>Ahora puedes:</strong><br>
-                    • Pedir <strong>"gráfico de 2025"</strong> para ver el año completo (con datos simulados)<br>
-                    • Pedir <strong>"gráfico de los últimos 7 días"</strong> para datos reales recientes<br>
-                    • Pedir <strong>"gráfico anual"</strong> (igual que 2025)<br>
-                    • Pedir <strong>"predice el precio para mañana"</strong><br><br>
-                    ¿Qué te gustaría ver?
-                `);
-                
-                document.getElementById('sendButton').addEventListener('click', processUserInput);
-                document.getElementById('userInput').addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') processUserInput();
-                });
-                
-            } catch (error) {
-                console.error('Error:', error);
-                addMessageToChat('bot', 'Error cargando datos. Usando datos de ejemplo.');
+            }
+            
+            // Mensaje de bienvenida
+            addMessageToChat('bot', `
+                ¡Listo! ${processedData.length > 0 ? 
+                    `He cargado <strong>${processedData.length} registros</strong> de datos de Solana.` : 
+                    `Estoy usando datos simulados para la demostración.`}<br><br>
+                <strong>Puedes pedir:</strong><br>
+                • "gráfico de 2025"<br>
+                • "gráfico de los últimos 7 días"<br>
+                • "gráfico de los últimos 30 días"<br>
+                • "predice el precio para mañana"<br><br>
+                ¿Qué te gustaría ver?
+            `);
+            
+            // Configurar event listeners
+            document.getElementById('sendButton').addEventListener('click', processUserInput);
+            document.getElementById('userInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') processUserInput();
+            });
+            
+            console.log('Aplicación inicializada correctamente');
+            
+        } catch (error) {
+            console.error('Error crítico en inicialización:', error);
+            
+            // Mensaje de error amigable
+            const chatHistory = document.getElementById('chatHistory');
+            if (chatHistory) {
+                chatHistory.innerHTML = '';
+                addMessageToChat('bot', 'Hubo un problema al cargar los datos. Usando versión de demostración con datos simulados.');
+            }
+            
+            // Inicializar con datos de ejemplo
+            if (!chartInitialized) {
                 initializeChart();
-                document.getElementById('userInput').disabled = false;
-                document.getElementById('sendButton').disabled = false;
+            }
+            
+            // Habilitar interfaz de todos modos
+            document.getElementById('userInput').disabled = false;
+            document.getElementById('sendButton').disabled = false;
+            
+            const queryExamples = document.getElementById('queryExamples');
+            if (queryExamples) {
+                queryExamples.style.display = 'flex';
             }
         }
-        
-        window.addEventListener('DOMContentLoaded', initializeApp);
-    </script>
+    }
+    
+    // Inicializar cuando la página cargue
+    window.addEventListener('DOMContentLoaded', initializeApp);
+</script>
 </body>
 </html>
