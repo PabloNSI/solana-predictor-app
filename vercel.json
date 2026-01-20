@@ -1,27 +1,14 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "backend/app.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "frontend/next.config.js",
-      "use": "@vercel/next"
-    }
-  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "backend/app.py"
+      "handle": "filesystem"
     },
     {
-      "src": "/(.*)",
-      "dest": "frontend/$1"
+      "src": "/.*",
+      "dest": "pages/index.js"
     }
-  ],
-  "env": {
-    "MODEL_PATH": "models/rf_model_best.pkl",
-    "DATA_PATH": "data/sol_1d_data_2020_to_2025.csv"
-  }
+  ]
 }
