@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solana Predictor - Simulación Académica</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+        }
+        
+        header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 24px 0;
+            border-bottom: 1px solid #334155;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00ffa3, #03e1ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 12px;
+        }
+        
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #475569;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+        
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #475569;
+        }
+        
+        .chat-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #00ffa3, #03e1ff);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            margin-bottom: 16px;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .user-message {
+            text-align: right;
+        }
+        
+        .bot-message {
+            text-align: left;
+        }
+        
+        .message-bubble {
+            display: inline-block;
+            padding: 12px 18px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        
+        .user-message .message-bubble {
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .bot-message .message-bubble {
+            background: rgba(71, 85, 105, 0.7);
+            border-bottom-left-radius: 4px;
+            color: #e2e8f0;
+        }
+        
+        .message-time {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 4px;
+            margin-left: 10px;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 12px;
+            margin-top: auto;
+        }
+        
+        #userInput {
+            flex: 1;
+            padding: 14px 18px;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid #475569;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.3s;
+        }
+        
+        #userInput:focus {
+            border-color: #00ffa3;
+        }
+        
+        #sendButton {
+            padding: 14px 24px;
+            background: linear-gradient(90deg, #00ffa3, #03e1ff);
+            color: #0f172a;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        #sendButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 163, 0.3);
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-bottom: 24px;
+        }
+        
+        .analysis-card {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            border-left: 4px solid #00ffa3;
+        }
+        
+        .indicator-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+        }
+        
+        .indicator {
+            text-align: center;
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+        }
+        
+        .indicator-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+        
+        .positive { color: #00ffa3; }
+        .neutral { color: #03e1ff; }
+        .warning { color: #fbbf24; }
+        
+        .query-examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .query-example {
+            padding: 8px 16px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .query-example:hover {
+            background: rgba(71, 85, 105, 0.8);
+        }
+        
+        footer {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #334155;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        .disclaimer {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 20px 0;
+            color: #fca5a5;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔮 Solana Predictor</h1>
+            <p class="subtitle">Simulación académica de análisis financiero para Solana (SOL) - Proyecto Unit 25: Applied Machine Learning</p>
+            <div class="disclaimer">
+                ⚠️ SIMULACIÓN ACADÉMICA: Esta aplicación genera datos aleatorios para demostración. No proporciona asesoramiento financiero real.
+            </div>
+        </header>
+        
+        <div class="card">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <div class="chat-icon">🤖</div>
+                    <div>
+                        <h2>Asistente de Análisis</h2>
+                        <p style="color: #94a3b8; font-size: 0.9rem;">Consulta en lenguaje natural sobre SOL</p>
+                    </div>
+                </div>
+                
+                <div class="chat-history" id="chatHistory">
+                    <div class="message bot-message">
+                        <div class="message-bubble">
+                            ¡Hola! Soy tu asistente de análisis de Solana (SOL). Puedo simular predicciones de precios, calcular indicadores técnicos y generar gráficos. ¿En qué te puedo ayudar?
+                        </div>
+                        <div class="message-time">Ahora</div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-container">
+                    <input type="text" id="userInput" placeholder="Escribe tu consulta (ej: predice el precio de SOL para mañana)" autocomplete="off">
+                    <button id="sendButton">Enviar</button>
+                </div>
+                
+                <div class="query-examples">
+                    <div class="query-example" onclick="insertExample('predice el precio de SOL para mañana')">Predice precio mañana</div>
+                    <div class="query-example" onclick="insertExample('muestra el gráfico de los últimos 7 días')">Gráfico 7 días</div>
+                    <div class="query-example" onclick="insertExample('calcula el RSI actual')">Calcular RSI</div>
+                    <div class="query-example" onclick="insertExample('análisis de volatilidad')">Análisis volatilidad</div>
+                    <div class="query-example" onclick="insertExample('tendencia para la próxima semana')">Tendencia próxima semana</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="chat-header">
+                <div class="chat-icon">📊</div>
+                <div>
+                    <h2>Visualizaciones & Resultados</h2>
+                    <p style="color: #94a3b8; font-size: 0.9rem;">Los gráficos se actualizan según tu consulta</p>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="priceChart"></canvas>
+            </div>
+            
+            <div id="analysisResults">
+                <div class="analysis-card">
+                    <h3>📈 Información Actual de SOL</h3>
+                    <p>Espera tu primera consulta para ver análisis personalizados. Usa ejemplos como "predice el precio" o "muestra el gráfico".</p>
+                </div>
+                
+                <div class="indicator-grid" id="indicators">
+                    <!-- Los indicadores se generarán aquí -->
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Proyecto Final Unit 25: Applied Machine Learning • Pearson HND • SIMULACIÓN ACADÉMICA</p>
+            <p style="margin-top: 8px; font-size: 0.8rem;">Esta versión funciona 100% localmente sin servidores externos ni modelos reales</p>
+        </footer>
+    </div>
+
+    <script>
+        // Configuración inicial
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        let priceChart;
+        let currentPrice = 152.37;
+        let lastQueryType = '';
+        
+        // Datos iniciales para el gráfico
+        const initialData = {
+            labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+            datasets: [{
+                label: 'Precio de SOL (USD)',
+                data: [148.50, 150.20, 151.80, 149.30, 152.10, 153.50, 152.37],
+                borderColor: '#00ffa3',
+                backgroundColor: 'rgba(0, 255, 163, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
+        };
+        
+        // Configuración del gráfico inicial
+        priceChart = new Chart(ctx, {
+            type: 'line',
+            data: initialData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } }
+                },
+                scales: {
+                    x: { 
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(71, 85, 105, 0.3)' },
+                        ticks: { 
+                            color: '#94a3b8',
+                            callback: function(value) {
+                                return '$' + value;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Funciones auxiliares
+        function getCurrentTime() {
+            const now = new Date();
+            return now.getHours().toString().padStart(2, '0') + ':' + 
+                   now.getMinutes().toString().padStart(2, '0');
+        }
+        
+        function insertExample(text) {
+            document.getElementById('userInput').value = text;
+        }
+        
+        function addMessageToChat(sender, message) {
+            const chatHistory = document.getElementById('chatHistory');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            
+            const time = getCurrentTime();
+            messageDiv.innerHTML = `
+                <div class="message-bubble">${message}</div>
+                <div class="message-time">${time}</div>
+            `;
+            
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+        
+        function simulateTyping() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot-message';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = `
+                <div class="message-bubble pulse">Escribiendo...</div>
+                <div class="message-time">${getCurrentTime()}</div>
+            `;
+            
+            document.getElementById('chatHistory').appendChild(typingDiv);
+            document.getElementById('chatHistory').scrollTop = document.getElementById('chatHistory').scrollHeight;
+            
+            return typingDiv;
+        }
+        
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+        
+        // Análisis de consultas del usuario
+        function analyzeQuery(query) {
+            query = query.toLowerCase();
+            let response = '';
+            let chartType = 'line';
+            let indicators = [];
+            
+            // Detectar tipo de consulta
+            if (query.includes('precio') && (query.includes('mañana') || query.includes('futuro') || query.includes('predice'))) {
+                lastQueryType = 'price_prediction';
+                response = generatePricePrediction();
+                indicators = generatePredictionIndicators();
+                updateChartWithPrediction();
+            } 
+            else if (query.includes('gráfico') || query.includes('grafico') || query.includes('visualización')) {
+                lastQueryType = 'chart';
+                response = "He generado una visualización actualizada del precio de SOL. También he calculado los indicadores técnicos más relevantes para tu análisis.";
+                indicators = generateTechnicalIndicators();
+                updateChartWithHistory();
+            }
+            else if (query.includes('rsi')) {
+                lastQueryType = 'rsi';
+                response = "El Índice de Fuerza Relativa (RSI) es un indicador de momento que mula la velocidad y el cambio de movimientos de precios. Un valor por encima de 70 generalmente indica sobrecompra, mientras que por debajo de 30 indica sobreventa.";
+                indicators = generateRSIIndicators();
+                updateChartWithRSI();
+            }
+            else if (query.includes('volatilidad') || query.includes('volátil')) {
+                lastQueryType = 'volatility';
+                response = "La volatilidad mide la variación en el precio de un activo durante un período específico. Alta volatilidad indica mayor riesgo pero también mayor potencial de retorno.";
+                indicators = generateVolatilityIndicators();
+                updateChartWithVolatility();
+            }
+            else if (query.includes('tendencia') || query.includes('análisis') || query.includes('analisis')) {
+                lastQueryType = 'trend';
+                response = "Basado en el análisis técnico de los últimos datos, puedo identificar patrones y tendencias en el precio de SOL.";
+                indicators = generateTrendIndicators();
+                updateChartWithTrend();
+            }
+            else {
+                lastQueryType = 'general';
+                response = "He analizado tu consulta sobre Solana. Te proporciono información general sobre el estado actual del mercado y algunos indicadores clave.";
+                indicators = generateGeneralIndicators();
+            }
+            
+            return { response, chartType, indicators };
+        }
+        
+        // Generadores de respuestas y datos
+        function generatePricePrediction() {
+            const trends = ['alcista', 'bajista', 'lateral'];
+            const trend = trends[Math.floor(Math.random() * trends.length)];
+            const change = (Math.random() * 8 - 3).toFixed(2);
+            const confidence = (70 + Math.random() * 25).toFixed(0);
+            
+            let predictionText = '';
+            if (trend === 'alcista') {
+                predictionText = `Mi análisis predice una tendencia <strong>${trend}</strong> para Solana en las próximas 24 horas. El precio podría aumentar aproximadamente un <strong>${change}%</strong>, alcanzando los <strong>$${(currentPrice * (1 + change/100)).toFixed(2)}</strong>.`;
+            } else if (trend === 'bajista') {
+                predictionText = `Mi análisis predice una tendencia <strong>${trend}</strong> para Solana en las próximas 24 horas. El precio podría disminuir aproximadamente un <strong>${Math.abs(change)}%</strong>, cayendo a <strong>$${(currentPrice * (1 + change/100)).toFixed(2)}</strong>.`;
+            } else {
+                predictionText = `Mi análisis predice un movimiento <strong>${trend}</strong> para Solana en las próximas 24 horas. El precio podría fluctuar alrededor de los <strong>$${currentPrice.toFixed(2)}</strong> con un cambio aproximado del <strong>${Math.abs(change)}%</strong>.`;
+            }
+            
+            predictionText += `<br><br>Confianza del modelo: <strong>${confidence}%</strong> (basado en análisis de patrones históricos).`;
+            predictionText += `<br><br>⚠️ Recuerda: Esta es una simulación académica. Las predicciones reales requieren modelos más complejos y datos en tiempo real.`;
+            
+            return predictionText;
+        }
+        
+        function generateTechnicalIndicators() {
+            return [
+                { name: 'Precio Actual', value: `$${currentPrice.toFixed(2)}`, change: '+1.2%', status: 'positive' },
+                { name: 'RSI (14 días)', value: '62.5', change: 'Neutral', status: 'neutral' },
+                { name: 'Volumen 24h', value: '$2.4B', change: '+5.7%', status: 'positive' },
+                { name: 'SMA (50 días)', value: '$148.20', change: 'Soporte', status: 'neutral' },
+                { name: 'Volatilidad', value: 'Alta', change: '28.5%', status: 'warning' },
+                { name: 'Sentimiento', value: 'Positivo', change: '72%', status: 'positive' }
+            ];
+        }
+        
+        function generatePredictionIndicators() {
+            return [
+                { name: 'Precio Actual', value: `$${currentPrice.toFixed(2)}`, change: '+1.2%', status: 'positive' },
+                { name: 'Predicción 24h', value: `$${(currentPrice * (1 + (Math.random() * 0.08 - 0.02))).toFixed(2)}`, change: '+2.4%', status: 'positive' },
+                { name: 'Confianza', value: '78%', change: 'Alta', status: 'positive' },
+                { name: 'RSI Predicho', value: '65.2', change: 'Neutral', status: 'neutral' },
+                { name: 'Rango Esperado', value: '$149-158', change: '±3.2%', status: 'warning' },
+                { name: 'Recomendación', value: 'Observar', change: 'Neutral', status: 'neutral' }
+            ];
+        }
+        
+        function generateRSIIndicators() {
+            return [
+                { name: 'RSI Actual', value: '62.5', change: 'Neutral', status: 'neutral' },
+                { name: 'Nivel Sobrecompra', value: '70+', change: 'Límite', status: 'warning' },
+                { name: 'Nivel Sobreventa', value: '30-', change: 'Límite', status: 'warning' },
+                { name: 'Tendencia RSI', value: 'Ascendente', change: '+2.1%', status: 'positive' },
+                { name: 'Divergencia', value: 'No detectada', change: 'Estable', status: 'neutral' },
+                { name: 'Señal', value: 'Neutral', change: 'Esperar', status: 'neutral' }
+            ];
+        }
+        
+        function generateVolatilityIndicators() {
+            return [
+                { name: 'Volatilidad 24h', value: '28.5%', change: 'Alta', status: 'warning' },
+                { name: 'Volatilidad 7d', value: '32.1%', change: 'Media', status: 'warning' },
+                { name: 'Máximo 24h', value: '$154.20', change: '+1.8%', status: 'positive' },
+                { name: 'Mínimo 24h', value: '$148.50', change: '-2.1%', status: 'warning' },
+                { name: 'Rango Diario', value: '3.7%', change: 'Estable', status: 'neutral' },
+                { name: 'Beta Mercado', value: '1.8', change: 'Volátil', status: 'warning' }
+            ];
+        }
+        
+        function generateTrendIndicators() {
+            return [
+                { name: 'Tendencia 7d', value: 'Alcista', change: '+5.2%', status: 'positive' },
+                { name: 'Soporte Principal', value: '$148.20', change: 'Fuerte', status: 'neutral' },
+                { name: 'Resistencia', value: '$156.80', change: 'Media', status: 'warning' },
+                { name: 'MACD', value: 'Positivo', change: '+0.0021', status: 'positive' },
+                { name: 'Media 50d vs 200d', value: 'Golden Cross', change: 'Alcista', status: 'positive' },
+                { name: 'Fuerza Tendencia', value: 'Media-Alta', change: '75%', status: 'positive' }
+            ];
+        }
+        
+        function generateGeneralIndicators() {
+            return [
+                { name: 'Precio SOL', value: `$${currentPrice.toFixed(2)}`, change: '+1.2%', status: 'positive' },
+                { name: 'Capitalización', value: '$68.4B', change: '+1.8%', status: 'positive' },
+                { name: 'Volumen 24h', value: '$2.4B', change: '+5.7%', status: 'positive' },
+                { name: 'Suministro', value: '435.9M SOL', change: 'Circulante', status: 'neutral' },
+                { name: 'Dominio BTC', value: '52.4%', change: '-0.3%', status: 'warning' },
+                { name: 'Miedo y Codicia', value: '68/100', change: 'Codicia', status: 'positive' }
+            ];
+        }
+        
+        // Actualizadores de gráficos
+        function updateChartWithPrediction() {
+            const days = ['Hoy', 'Mañana', '2 días', '3 días', '4 días', '5 días', '6 días'];
+            const basePrice = currentPrice;
+            const newData = [];
+            
+            for (let i = 0; i < 7; i++) {
+                if (i === 0) {
+                    newData.push(basePrice);
+                } else {
+                    // Generar tendencia con algo de aleatoriedad
+                    const change = (Math.random() * 4 - 1.5) / 100;
+                    newData.push(newData[i-1] * (1 + change));
+                }
+            }
+            
+            priceChart.data.labels = days;
+            priceChart.data.datasets[0].data = newData;
+            priceChart.data.datasets[0].label = 'Predicción de precio SOL (USD)';
+            priceChart.data.datasets[0].borderColor = '#03e1ff';
+            priceChart.data.datasets[0].backgroundColor = 'rgba(3, 225, 255, 0.1)';
+            priceChart.update();
+        }
+        
+        function updateChartWithHistory() {
+            const days = ['Hace 6d', 'Hace 5d', 'Hace 4d', 'Hace 3d', 'Ayer', 'Hoy', 'Mañana'];
+            const basePrice = 145;
+            const newData = [];
+            
+            for (let i = 0; i < 7; i++) {
+                const change = (Math.random() * 3 - 1) / 100;
+                newData.push(i === 0 ? basePrice : newData[i-1] * (1 + change));
+            }
+            
+            priceChart.data.labels = days;
+            priceChart.data.datasets[0].data = newData;
+            priceChart.data.datasets[0].label = 'Histórico de precio SOL (USD)';
+            priceChart.data.datasets[0].borderColor = '#00ffa3';
+            priceChart.data.datasets[0].backgroundColor = 'rgba(0, 255, 163, 0.1)';
+            priceChart.update();
+        }
+        
+        function updateChartWithRSI() {
+            const days = ['Día 1', 'Día 2', 'Día 3', 'Día 4', 'Día 5', 'Día 6', 'Día 7'];
+            const newData = [];
+            
+            for (let i = 0; i < 7; i++) {
+                newData.push(40 + Math.random() * 40);
+            }
+            
+            priceChart.data.labels = days;
+            priceChart.data.datasets[0].data = newData;
+            priceChart.data.datasets[0].label = 'RSI de SOL (14 períodos)';
+            priceChart.data.datasets[0].borderColor = '#fbbf24';
+            priceChart.data.datasets[0].backgroundColor = 'rgba(251, 191, 36, 0.1)';
+            priceChart.update();
+        }
+        
+        function updateChartWithVolatility() {
+            const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+            const basePrice = currentPrice;
+            const newData = [];
+            
+            for (let i = 0; i < 7; i++) {
+                // Mayor volatilidad
+                const change = (Math.random() * 8 - 4) / 100;
+                newData.push(i === 0 ? basePrice : newData[i-1] * (1 + change));
+            }
+            
+            priceChart.data.labels = days;
+            priceChart.data.datasets[0].data = newData;
+            priceChart.data.datasets[0].label = 'Precio SOL con alta volatilidad (USD)';
+            priceChart.data.datasets[0].borderColor = '#f87171';
+            priceChart.data.datasets[0].backgroundColor = 'rgba(248, 113, 113, 0.1)';
+            priceChart.update();
+        }
+        
+        function updateChartWithTrend() {
+            const days = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul'];
+            const basePrice = 120;
+            const newData = [];
+            
+            // Tendencia claramente alcista
+            for (let i = 0; i < 7; i++) {
+                const change = 0.03 + (Math.random() * 0.02);
+                newData.push(i === 0 ? basePrice : newData[i-1] * (1 + change));
+            }
+            
+            priceChart.data.labels = days;
+            priceChart.data.datasets[0].data = newData;
+            priceChart.data.datasets[0].label = 'Tendencia alcista de SOL (USD)';
+            priceChart.data.datasets[0].borderColor = '#00ffa3';
+            priceChart.data.datasets[0].backgroundColor = 'rgba(0, 255, 163, 0.2)';
+            priceChart.update();
+        }
+        
+        function updateIndicators(indicators) {
+            const indicatorsContainer = document.getElementById('indicators');
+            indicatorsContainer.innerHTML = '';
+            
+            indicators.forEach(indicator => {
+                const indicatorDiv = document.createElement('div');
+                indicatorDiv.className = 'indicator';
+                
+                let statusClass = '';
+                if (indicator.status === 'positive') statusClass = 'positive';
+                else if (indicator.status === 'warning') statusClass = 'warning';
+                else statusClass = 'neutral';
+                
+                indicatorDiv.innerHTML = `
+                    <div style="font-size: 0.9rem; color: #94a3b8;">${indicator.name}</div>
+                    <div class="indicator-value ${statusClass}">${indicator.value}</div>
+                    <div style="font-size: 0.85rem; color: ${indicator.status === 'positive' ? '#00ffa3' : indicator.status === 'warning' ? '#fbbf24' : '#03e1ff'}">
+                        ${indicator.change}
+                    </div>
+                `;
+                
+                indicatorsContainer.appendChild(indicatorDiv);
+            });
+        }
+        
+        // Manejo del envío de mensajes
+        document.getElementById('sendButton').addEventListener('click', processUserInput);
+        document.getElementById('userInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') processUserInput();
+        });
+        
+        function processUserInput() {
+            const userInput = document.getElementById('userInput').value.trim();
+            if (!userInput) return;
+            
+            // Agregar mensaje del usuario
+            addMessageToChat('user', userInput);
+            document.getElementById('userInput').value = '';
+            
+            // Simular que el bot está escribiendo
+            const typingIndicator = simulateTyping();
+            
+            // Procesar después de un breve retraso (simula análisis)
+            setTimeout(() => {
+                removeTypingIndicator();
+                
+                // Analizar consulta y generar respuesta
+                const analysis = analyzeQuery(userInput);
+                addMessageToChat('bot', analysis.response);
+                
+                // Actualizar indicadores
+                updateIndicators(analysis.indicators);
+                
+                // Actualizar texto de análisis
+                updateAnalysisText(userInput);
+            }, 1500 + Math.random() * 1000);
+        }
+        
+        function updateAnalysisText(query) {
+            const analysisResults = document.getElementById('analysisResults');
+            const analysisCard = analysisResults.querySelector('.analysis-card') || document.createElement('div');
+            
+            let analysisText = '';
+            
+            if (lastQueryType === 'price_prediction') {
+                analysisText = `
+                    <h3>📈 Análisis de Predicción</h3>
+                    <p>Tu consulta "<strong>${query}</strong>" ha activado el módulo de predicción. El modelo ha analizado patrones históricos similares, tendencias del mercado, y volumen de trading para generar esta proyección.</p>
+                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Tiempo simulado de procesamiento: 1.8s | Datos analizados: 45,720 puntos | Confianza media: 78%</p>
+                `;
+            } else if (lastQueryType === 'chart') {
+                analysisText = `
+                    <h3>📊 Análisis de Visualización</h3>
+                    <p>He generado un gráfico personalizado basado en tu consulta "<strong>${query}</strong>". Los datos muestran tendencias clave, niveles de soporte/resistencia, y puntos de interés para tu análisis técnico.</p>
+                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Indicadores calculados: 6 | Período: 7 días | Resolución: Horaria</p>
+                `;
+            } else if (lastQueryType === 'rsi') {
+                analysisText = `
+                    <h3>⚖️ Análisis de RSI</h3>
+                    <p>Tu consulta sobre "<strong>${query}</strong>" ha generado un análisis del Índice de Fuerza Relativa. El RSI actual sugiere condiciones de mercado neutrales con tendencia alcista moderada.</p>
+                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Período RSI: 14 velas | Sobrecompra: >70 | Sobreventa: <30 | Última señal: Hace 2 días</p>
+                `;
+            } else if (lastQueryType === 'volatility') {
+                analysisText = `
+                    <h3>🌊 Análisis de Volatilidad</h3>
+                    <p>Basado en tu consulta "<strong>${query}</strong>", he calculado métricas de volatilidad. Los valores actuales indican un mercado moderadamente volátil, típico de activos cripto de gran capitalización.</p>
+                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Volatilidad anualizada: 85% | Máximo histórico: 320% | Mínimo histórico: 35%</p>
+                `;
+            } else if (lastQueryType === 'trend') {
+                analysisText = `
+                    <h3>🧭 Análisis de Tendencia</h3>
+                    <p>Tu consulta "<strong>${query}</strong>" ha activado el módulo de análisis de tendencias. Los indicadores sugieren una tendencia alcista a medio plazo con soportes bien definidos.</p>
+                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Tendencia primaria: Alcista | Tendencia secundaria: Lateral | Fuerza: Media-Alta</p>
+                `;
+            } else {
+                analysisText = `
+                    <h3>🔍 Análisis General</h3>
+                    <p>He procesado tu consulta "<strong>${query}</strong>" y te proporciono información general sobre Solana. Los indicadores clave muestran un mercado saludable con volumen creciente.</p>
+                    <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Mercado: Criptomonedas | Capitalización: #5 global | Dominio: 3.8% del total cripto</p>
+                `;
+            }
+            
+            if (!analysisResults.querySelector('.analysis-card')) {
+                analysisCard.className = 'analysis-card';
+                analysisResults.insertBefore(analysisCard, indicatorsContainer);
+            }
+            
+            analysisCard.innerHTML = analysisText;
+        }
+        
+        // Inicializar con datos por defecto
+        updateIndicators(generateTechnicalIndicators());
+        
+        // Ejemplo de consulta inicial después de 2 segundos
+        setTimeout(() => {
+            const initialQuery = "Muestra el gráfico de los últimos 7 días";
+            document.getElementById('userInput').value = initialQuery;
+        }, 2000);
+    </script>
+</body>
+</html>
