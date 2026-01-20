@@ -1,14 +1,27 @@
 {
-  "functions": {
-    "api/*.py": {
-      "maxDuration": 10,
-      "memory": 1024
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/next.config.js",
+      "use": "@vercel/next"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/$1.py"
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/$1"
     }
-  ]
+  ],
+  "env": {
+    "MODEL_PATH": "models/rf_model_best.pkl",
+    "DATA_PATH": "data/sol_1d_data_2020_to_2025.csv"
+  }
 }
